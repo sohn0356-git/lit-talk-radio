@@ -1,11 +1,22 @@
-import JSZip from "jszip";
+﻿import JSZip from "jszip";
 import type { Expression, Participant, Turn } from "../data";
-import { getSelectedSession } from "../store";
+import { getCurrentSession } from "../store";
 
 type AspectMode = "16:9" | "9:16";
 
 export function renderSession(root: HTMLElement) {
-  const session = getSelectedSession();
+  const session = getCurrentSession();
+  if (!session) {
+    root.innerHTML = `
+      <div class="card">
+        <div style="font-weight:700; font-size:18px;">Session</div>
+        <div class="muted">생성된 토론이 없습니다. Home에서 책/챕터를 선택하고 토론을 시작하세요.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const sessionData = session;
 
   let aspect: AspectMode = "16:9";
   let idx = 0;
@@ -17,8 +28,8 @@ export function renderSession(root: HTMLElement) {
       <div class="row">
         <div>
           <div style="font-weight:700; font-size:18px;">Session</div>
-          <div class="muted">${session.id} · ${session.title}</div>
-          <div class="muted">Participants: ${session.participants.length} (max 4) · Turns: ${session.turns.length}</div>
+          <div class="muted">${sessionData.date} / ${sessionData.bookTitle} / Chapter ${sessionData.chapter}</div>
+          <div class="muted">Participants: ${sessionData.participants.length} (max 4) · Turns: ${sessionData.turns.length}</div>
         </div>
         <div class="muted">Aspect: <span id="aspectLabel">16:9</span></div>
       </div>
@@ -44,8 +55,8 @@ export function renderSession(root: HTMLElement) {
 
     <div class="card">
       <div class="muted">
-        아바타 경로: <span class="kbd">/avatars/{id}/{expression}.png</span>
-        (없으면 neutral로 자동 대체)
+        ?꾨컮? 寃쎈줈: <span class="kbd">/avatars/{id}/{expression}.png</span>
+        (?놁쑝硫?neutral濡??먮룞 ?泥?
       </div>
     </div>
   `;
@@ -87,7 +98,7 @@ export function renderSession(root: HTMLElement) {
     p: Participant,
     expr: Expression
   ): Promise<HTMLImageElement | null> {
-    // expr 파일이 없을 수 있으니 neutral로 폴백
+    // expr ?뚯씪???놁쓣 ???덉쑝??neutral濡??대갚
     try {
       return await loadImage(avatarSrc(p, expr));
     } catch {
@@ -145,8 +156,8 @@ export function renderSession(root: HTMLElement) {
     lineHeight: number,
     maxLines: number
   ) {
-    // 한국어는 공백이 적을 수 있어 “단어 기반”이 약하니까,
-    // 공백 우선 + 너무 길면 글자 단위로도 줄바꿈
+    // ?쒓뎅?대뒗 怨듬갚???곸쓣 ???덉뼱 ?쒕떒??湲곕컲?앹씠 ?쏀븯?덇퉴,
+    // 怨듬갚 ?곗꽑 + ?덈Т 湲몃㈃ 湲???⑥쐞濡쒕룄 以꾨컮轅?
     const words = text.split(" ");
     const lines: string[] = [];
     let line = "";
@@ -167,7 +178,7 @@ export function renderSession(root: HTMLElement) {
     }
     if (lines.length < maxLines && line) pushLine(line);
 
-    // 공백이 거의 없는 긴 텍스트 대비(마지막 줄이 너무 길면 잘라냄)
+    // 怨듬갚??嫄곗쓽 ?녿뒗 湲??띿뒪???鍮?留덉?留?以꾩씠 ?덈Т 湲몃㈃ ?섎씪??
     if (lines.length === 1 && c.measureText(lines[0]).width > maxWidth) {
       const s = lines[0];
       lines.length = 0;
@@ -194,7 +205,7 @@ export function renderSession(root: HTMLElement) {
     ctx.fillStyle = "#0b0b0f";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 미세 노이즈(분위기)
+    // 誘몄꽭 ?몄씠利?遺꾩쐞湲?
     ctx.globalAlpha = 0.05;
     ctx.fillStyle = "#ffffff";
     for (let i = 0; i < 800; i++) {
@@ -207,7 +218,7 @@ export function renderSession(root: HTMLElement) {
     ctx.globalAlpha = 0.92;
     ctx.fillStyle = "#dfe2ff";
     ctx.font = "600 18px system-ui";
-    ctx.fillText("Lit Talk Radio · Session (Text Only)", 24, 34);
+    ctx.fillText("Lit Talk Radio 쨌 Session (Text Only)", 24, 34);
     ctx.globalAlpha = 1;
 
     ctx.globalAlpha = 0.22;
@@ -233,11 +244,11 @@ export function renderSession(root: HTMLElement) {
 
     const r = isPortrait ? 54 : 52;
 
-    // 최대 4명: 16:9은 상단 가로, 9:16은 2x2
+    // 理쒕? 4紐? 16:9? ?곷떒 媛濡? 9:16? 2x2
     if (!isPortrait) {
       const y = 140;
       const n = participants.length;
-      // 중앙 정렬 가로 배치
+      // 以묒븰 ?뺣젹 媛濡?諛곗튂
       const minX = W * 0.18;
       const maxX = W * 0.82;
       const slots: AvatarSlot[] = [];
@@ -285,7 +296,7 @@ export function renderSession(root: HTMLElement) {
   }
 
   function drawAvatarFrame(x: number, y: number, r: number, speaking: boolean) {
-    // 링(퍼지는 효과)
+    // 留??쇱????④낵)
     if (speaking) {
       const t = ringPhase;
       const ringR = r + 2 + t * 20;
@@ -297,7 +308,7 @@ export function renderSession(root: HTMLElement) {
       ctx.stroke();
       ctx.globalAlpha = 1;
 
-      // 안쪽 링
+      // ?덉そ 留?
       ctx.globalAlpha = 0.85;
       ctx.strokeStyle = "#dfe2ff";
       ctx.lineWidth = 2;
@@ -307,7 +318,7 @@ export function renderSession(root: HTMLElement) {
       ctx.globalAlpha = 1;
     }
 
-    // 기본 테두리
+    // 湲곕낯 ?뚮몢由?
     ctx.fillStyle = "#17171c";
     ctx.strokeStyle = speaking ? "#aab0ff" : "#2a2a34";
     ctx.lineWidth = 2;
@@ -322,34 +333,34 @@ export function renderSession(root: HTMLElement) {
     const H = canvas.height;
     const isPortrait = aspect === "9:16";
 
-    // 말풍선 기본 크기
+    // 留먰뭾??湲곕낯 ?ш린
     const maxW = isPortrait ? W - 80 : Math.min(760, W - 120);
     const padding = 18;
     const lineHeight = isPortrait ? 34 : 28;
 
-    // 아바타 옆 기본 위치(오른쪽)
+    // ?꾨컮? ??湲곕낯 ?꾩튂(?ㅻⅨ履?
     let boxX = slot.x + slot.r + 18;
     let boxY = slot.y - slot.r;
     let boxW = maxW;
     let boxH = isPortrait ? 260 : 180;
 
-    // 화면 밖으로 나가면 왼쪽으로
+    // ?붾㈃ 諛뽰쑝濡??섍?硫??쇱そ?쇰줈
     if (boxX + boxW > W - 24) {
       boxX = slot.x - slot.r - 18 - boxW;
     }
-    // 위쪽 나가면 내려
+    // ?꾩そ ?섍?硫??대젮
     if (boxY < 70) boxY = 70;
 
-    // 9:16은 상단이 복잡하니까 너무 겹치면 아래로 밀기
+    // 9:16? ?곷떒??蹂듭옟?섎땲源??덈Т 寃뱀튂硫??꾨옒濡?諛湲?
     if (isPortrait) {
-      // 말풍선이 아바타 영역을 지나치게 덮으면 아래로
+      // 留먰뭾?좎씠 ?꾨컮? ?곸뿭??吏?섏튂寃???쑝硫??꾨옒濡?
       const overlapTop = boxY < slot.y + slot.r + 16;
       if (overlapTop) boxY = slot.y + slot.r + 20;
-      // 그래도 아래로 넘어가면 화면 중간으로 조정
+      // 洹몃옒???꾨옒濡??섏뼱媛硫??붾㈃ 以묎컙?쇰줈 議곗젙
       if (boxY + boxH > H - 24) boxY = H - 24 - boxH;
     }
 
-    // 말풍선 박스
+    // 留먰뭾??諛뺤뒪
     ctx.fillStyle = "#17171c";
     ctx.strokeStyle = "#23232b";
     ctx.lineWidth = 2;
@@ -357,19 +368,14 @@ export function renderSession(root: HTMLElement) {
     ctx.fill();
     ctx.stroke();
 
-    // 말풍선 꼬리(삼각형 느낌)
+    // 留먰뭾??瑗щ━(?쇨컖???먮굦)
     ctx.fillStyle = "#17171c";
     ctx.strokeStyle = "#23232b";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    const tailX = clamp(
-      slot.x + (boxX > slot.x ? slot.r : -slot.r),
-      24,
-      W - 24
-    );
     const tailY = clamp(slot.y, 70, H - 24);
     const baseY = clamp(tailY, boxY + 20, boxY + boxH - 20);
-    const dir = boxX > slot.x ? -1 : 1; // box가 오른쪽이면 꼬리는 왼쪽 향함
+    const dir = boxX > slot.x ? -1 : 1; // box媛 ?ㅻⅨ履쎌씠硫?瑗щ━???쇱そ ?ν븿
     ctx.moveTo(boxX + (dir === -1 ? 0 : boxW), baseY);
     ctx.lineTo(boxX + (dir === -1 ? 0 : boxW) + 18 * dir, baseY + 10);
     ctx.lineTo(boxX + (dir === -1 ? 0 : boxW) + 18 * dir, baseY - 10);
@@ -377,7 +383,7 @@ export function renderSession(root: HTMLElement) {
     ctx.fill();
     ctx.stroke();
 
-    // 텍스트
+    // ?띿뒪??
     ctx.fillStyle = "#eaeaf0";
     ctx.font = isPortrait ? "500 22px system-ui" : "500 18px system-ui";
     wrapText(
@@ -390,35 +396,35 @@ export function renderSession(root: HTMLElement) {
       isPortrait ? 6 : 5
     );
 
-    // 하단 진행 표시
+    // ?섎떒 吏꾪뻾 ?쒖떆
     ctx.fillStyle = "#b7b7c6";
     ctx.font = "600 14px system-ui";
     ctx.fillText(
-      `Turn ${idx + 1} / ${session.turns.length}`,
+      `Turn ${idx + 1} / ${sessionData.turns.length}`,
       boxX + padding,
       boxY + boxH - 18
     );
   }
 
   async function drawAvatarsAndBubble(turn: Turn) {
-    const slots = computeAvatarSlots(session.participants);
+    const slots = computeAvatarSlots(sessionData.participants);
     const slotById = new Map(slots.map((s) => [s.id, s]));
     const activeSlot = slotById.get(turn.speakerId) ?? slots[0];
 
-    // 아바타들 그리기
+    // ?꾨컮???洹몃━湲?
     for (const slot of slots) {
       const speaking = slot.id === turn.speakerId;
       drawAvatarFrame(slot.x, slot.y, slot.r, speaking);
 
-      const p = session.participants.find((pp) => pp.id === slot.id)!;
-      // speaking일 때는 해당 turn의 표정, 아니면 neutral
+      const p = sessionData.participants.find((pp) => pp.id === slot.id)!;
+      // speaking???뚮뒗 ?대떦 turn???쒖젙, ?꾨땲硫?neutral
       const expr = speaking ? turn.expression : "neutral";
       const img = await getAvatarImage(p, expr);
 
       if (img) {
         drawAvatarImageInCircle(img, slot.x, slot.y, slot.r - 2);
       } else {
-        // 이미지가 없을 때 fallback 글자
+        // ?대?吏媛 ?놁쓣 ??fallback 湲??
         ctx.fillStyle = "#eaeaf0";
         ctx.font = "800 22px system-ui";
         ctx.textAlign = "center";
@@ -429,12 +435,12 @@ export function renderSession(root: HTMLElement) {
       }
     }
 
-    // 말풍선(아바타 옆)
+    // 留먰뭾???꾨컮? ??
     if (activeSlot) drawBubbleNearAvatar(activeSlot, turn.text);
   }
 
   async function renderFrame(dt: number, turn: Turn) {
-    // 링 애니메이션
+    // 留??좊땲硫붿씠??
     const speed = 1 / 1.2;
     ringPhase = (ringPhase + dt * speed) % 1;
 
@@ -446,17 +452,17 @@ export function renderSession(root: HTMLElement) {
     const dt = (t - lastT) / 1000;
     lastT = t;
 
-    const turn = session.turns[idx] ?? session.turns[0];
+    const turn = sessionData.turns[idx] ?? sessionData.turns[0];
     await renderFrame(dt, turn);
 
     requestAnimationFrame(loop);
   }
 
   function next() {
-    idx = (idx + 1) % session.turns.length;
+    idx = (idx + 1) % sessionData.turns.length;
   }
   function prev() {
-    idx = (idx - 1 + session.turns.length) % session.turns.length;
+    idx = (idx - 1 + sessionData.turns.length) % sessionData.turns.length;
   }
 
   function setAspect(mode: AspectMode) {
@@ -466,7 +472,7 @@ export function renderSession(root: HTMLElement) {
 
   function downloadPNG() {
     const a = document.createElement("a");
-    a.download = `lit-talk-radio_${session.id}_${aspect}_turn${String(
+    a.download = `lit-talk-radio_${sessionData.id}_${aspect}_turn${String(
       idx + 1
     ).padStart(3, "0")}.png`;
     a.href = canvas.toDataURL("image/png");
@@ -474,27 +480,27 @@ export function renderSession(root: HTMLElement) {
   }
 
   async function downloadAllZip() {
-    // 현재 aspect 기준으로 "모든 턴"을 렌더링해서 zip으로 묶음
+    // ?꾩옱 aspect 湲곗??쇰줈 "紐⑤뱺 ?????뚮뜑留곹빐??zip?쇰줈 臾띠쓬
     downloadAllBtn.disabled = true;
     downloadAllBtn.textContent = "Zipping...";
 
     try {
       const zip = new JSZip();
-      const folder = zip.folder(`${session.id}_${aspect}`)!;
+      const folder = zip.folder(`${sessionData.id}_${aspect}`)!;
 
-      // 애니메이션 시간은 필요 없고 “정적 프레임”만 뽑으면 되니까
-      // ringPhase를 고정값으로 두고 렌더
+      // ?좊땲硫붿씠???쒓컙? ?꾩슂 ?녾퀬 ?쒖젙???꾨젅?꾟앸쭔 戮묒쑝硫??섎땲源?
+      // ringPhase瑜?怨좎젙媛믪쑝濡??먭퀬 ?뚮뜑
       const savedRing = ringPhase;
       ringPhase = 0.35;
 
-      // 현재 canvas 사이즈로 고정
+      // ?꾩옱 canvas ?ъ씠利덈줈 怨좎젙
       setCanvasSize(aspect);
 
-      for (let i = 0; i < session.turns.length; i++) {
-        // 인덱스 바꿔서 그리기
+      for (let i = 0; i < sessionData.turns.length; i++) {
+        // ?몃뜳??諛붽퓭??洹몃━湲?
         idx = i;
         drawBackground();
-        await drawAvatarsAndBubble(session.turns[i]);
+        await drawAvatarsAndBubble(sessionData.turns[i]);
 
         const dataUrl = canvas.toDataURL("image/png");
         const base64 = dataUrl.split(",")[1];
@@ -509,7 +515,7 @@ export function renderSession(root: HTMLElement) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `lit-talk-radio_${session.id}_${aspect}.zip`;
+      a.download = `lit-talk-radio_${sessionData.id}_${aspect}.zip`;
       a.click();
       URL.revokeObjectURL(url);
     } finally {
@@ -539,3 +545,5 @@ export function renderSession(root: HTMLElement) {
   setAspect("16:9");
   requestAnimationFrame((t) => loop(t));
 }
+
+
