@@ -44,6 +44,11 @@ export const BOOKS: Book[] = [
     title: "정의란 무엇인가",
     totalChapters: 10,
   },
+  {
+    id: "mere-christianity",
+    title: "순전한 기독교",
+    totalChapters: 4,
+  },
 ];
 
 export const PARTICIPANTS: Participant[] = [
