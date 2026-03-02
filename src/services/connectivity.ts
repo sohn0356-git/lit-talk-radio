@@ -13,6 +13,12 @@ export type ConnectionCheckResult = {
 
 const CHECK_TIMEOUT_MS = 8000;
 
+function debugValue(raw: string | undefined): string {
+  if (!raw) return "<empty>";
+  if (raw.length <= 8) return `${raw} (len:${raw.length})`;
+  return `${raw.slice(0, 4)}...${raw.slice(-4)} (len:${raw.length})`;
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = window.setTimeout(() => {
@@ -33,10 +39,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKeyDebug = debugValue(apiKey);
   if (!apiKey) {
     return {
       ok: false,
-      message: "VITE_GEMINI_API_KEY 누락",
+      message: `VITE_GEMINI_API_KEY 누락 (key: ${apiKeyDebug})`,
     };
   }
 
@@ -70,7 +77,7 @@ export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
       const errText = await response.text();
       return {
         ok: false,
-        message: `Gemini API 실패 (${response.status}): ${errText}`,
+        message: `Gemini API 실패 (${response.status}): ${errText} (key: ${apiKeyDebug})`,
       };
     }
 
@@ -80,18 +87,26 @@ export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
       ok: false,
       message: `Gemini 네트워크 오류: ${
         error instanceof Error ? error.message : String(error)
-      }`,
+      } (key: ${apiKeyDebug})`,
     };
   }
 }
 
 export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> {
+  const firebaseDebug = [
+    `apiKey=${debugValue(import.meta.env.VITE_FIREBASE_API_KEY)}`,
+    `projectId=${debugValue(import.meta.env.VITE_FIREBASE_PROJECT_ID)}`,
+    `authDomain=${debugValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN)}`,
+  ].join(", ");
+
   try {
     assertFirebaseReady();
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : String(error),
+      message: `${
+        error instanceof Error ? error.message : String(error)
+      } (${firebaseDebug})`,
     };
   }
 
@@ -117,7 +132,7 @@ export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> 
       ok: false,
       message: `Firebase 접근 실패: ${
         error instanceof Error ? error.message : String(error)
-      }`,
+      } (${firebaseDebug})`,
     };
   }
 }
