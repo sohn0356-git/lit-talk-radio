@@ -11,6 +11,26 @@ export type ConnectionCheckResult = {
   message: string;
 };
 
+const CHECK_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} 타임아웃 (${ms}ms)`));
+    }, ms);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
@@ -21,6 +41,9 @@ export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
   }
 
   try {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
@@ -38,8 +61,10 @@ export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
             maxOutputTokens: 8,
           },
         }),
+        signal: controller.signal,
       }
     );
+    window.clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errText = await response.text();
@@ -77,11 +102,15 @@ export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> 
   );
 
   try {
-    await setDoc(pingRef, {
-      createdAt: serverTimestamp(),
-      source: "web-client",
-    });
-    await deleteDoc(pingRef);
+    await withTimeout(
+      setDoc(pingRef, {
+        createdAt: serverTimestamp(),
+        source: "web-client",
+      }),
+      CHECK_TIMEOUT_MS,
+      "Firebase setDoc"
+    );
+    await withTimeout(deleteDoc(pingRef), CHECK_TIMEOUT_MS, "Firebase deleteDoc");
     return { ok: true, message: "Firebase 쓰기/삭제 정상" };
   } catch (error) {
     return {
