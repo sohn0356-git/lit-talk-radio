@@ -9,6 +9,10 @@ import {
   setSelectedChapter,
 } from "../store";
 import { createDebateSession } from "../services/debateOrchestrator";
+import {
+  checkFirebaseConnection,
+  checkGeminiConnection,
+} from "../services/connectivity";
 
 export function renderHome(root: HTMLElement) {
   const selectedBookId = getSelectedBookId();
@@ -28,14 +32,25 @@ export function renderHome(root: HTMLElement) {
     </div>
 
     <div class="card">
+      <div class="row">
+        <div>
+          <div style="font-weight:700; margin-bottom:8px;">연결 상태</div>
+          <div class="muted" id="geminiConnText">Gemini: 확인 중...</div>
+          <div class="muted" id="firebaseConnText">Firebase: 확인 중...</div>
+        </div>
+        <button class="btn" id="retryConnBtn">다시 확인</button>
+      </div>
+    </div>
+
+    <div class="card">
       <div style="font-weight:700; margin-bottom:10px;">1) 책 선택</div>
-      <div class="list" id="bookList"></div>
+      <select id="bookSelect"></select>
     </div>
 
     <div class="card">
       <div style="font-weight:700; margin-bottom:10px;">2) 챕터 선택</div>
       <div class="muted" style="margin-bottom:12px;">총 ${selectedBook.totalChapters}개 챕터 중 선택</div>
-      <div class="list" id="chapterList"></div>
+      <select id="chapterSelect"></select>
     </div>
 
     <div class="card">
@@ -53,35 +68,73 @@ export function renderHome(root: HTMLElement) {
   (root.querySelector("#goArchive") as HTMLButtonElement).onclick = () => {
     navigate("/archive");
   };
+  const retryConnBtn = root.querySelector("#retryConnBtn") as HTMLButtonElement;
+  const geminiConnText = root.querySelector("#geminiConnText") as HTMLDivElement;
+  const firebaseConnText = root.querySelector(
+    "#firebaseConnText"
+  ) as HTMLDivElement;
 
-  const bookList = root.querySelector("#bookList") as HTMLDivElement;
-  bookList.innerHTML = "";
+  async function runConnectionChecks() {
+    retryConnBtn.disabled = true;
+    retryConnBtn.textContent = "확인 중...";
+    geminiConnText.textContent = "Gemini: 확인 중...";
+    firebaseConnText.textContent = "Firebase: 확인 중...";
+
+    const [gemini, firebase] = await Promise.all([
+      checkGeminiConnection(),
+      checkFirebaseConnection(),
+    ]);
+
+    geminiConnText.textContent = `Gemini: ${
+      gemini.ok ? "연결됨" : "실패"
+    } (${gemini.message})`;
+    firebaseConnText.textContent = `Firebase: ${
+      firebase.ok ? "연결됨" : "실패"
+    } (${firebase.message})`;
+
+    retryConnBtn.disabled = false;
+    retryConnBtn.textContent = "다시 확인";
+  }
+
+  retryConnBtn.onclick = () => {
+    void runConnectionChecks();
+  };
+  void runConnectionChecks();
+
+  const bookSelect = root.querySelector("#bookSelect") as HTMLSelectElement;
+  bookSelect.innerHTML = "";
 
   for (const book of BOOKS) {
-    const btn = document.createElement("button");
-    btn.className = "btn" + (book.id === selectedBookId ? " primary" : "");
-    btn.textContent = book.title;
-    btn.onclick = () => {
-      setSelectedBookId(book.id);
-      setSelectedChapter(1);
-      renderHome(root);
-    };
-    bookList.appendChild(btn);
+    const option = document.createElement("option");
+    option.value = book.id;
+    option.textContent = book.title;
+    option.selected = book.id === selectedBookId;
+    bookSelect.appendChild(option);
   }
 
-  const chapterList = root.querySelector("#chapterList") as HTMLDivElement;
-  chapterList.innerHTML = "";
+  bookSelect.onchange = () => {
+    setSelectedBookId(bookSelect.value);
+    setSelectedChapter(1);
+    renderHome(root);
+  };
+
+  const chapterSelect = root.querySelector(
+    "#chapterSelect"
+  ) as HTMLSelectElement;
+  chapterSelect.innerHTML = "";
 
   for (let chapter = 1; chapter <= selectedBook.totalChapters; chapter++) {
-    const btn = document.createElement("button");
-    btn.className = "btn" + (chapter === selectedChapter ? " primary" : "");
-    btn.textContent = `Chapter ${chapter}`;
-    btn.onclick = () => {
-      setSelectedChapter(chapter);
-      renderHome(root);
-    };
-    chapterList.appendChild(btn);
+    const option = document.createElement("option");
+    option.value = String(chapter);
+    option.textContent = `Chapter ${chapter}`;
+    option.selected = chapter === selectedChapter;
+    chapterSelect.appendChild(option);
   }
+
+  chapterSelect.onchange = () => {
+    setSelectedChapter(Number(chapterSelect.value));
+    renderHome(root);
+  };
 
   const startDebateBtn = root.querySelector("#startDebateBtn") as HTMLButtonElement;
   const statusText = root.querySelector("#statusText") as HTMLDivElement;
