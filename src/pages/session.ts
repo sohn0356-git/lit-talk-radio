@@ -150,7 +150,6 @@ export function renderSession(root: HTMLElement) {
 
   function drawAvatars(activeSpeaker: number) {
     const W = canvas.width;
-    const H = canvas.height;
 
     const isPortrait = aspect === "9:16";
     const avatarR = isPortrait ? 54 : 48;
