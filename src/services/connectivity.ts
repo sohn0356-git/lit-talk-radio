@@ -1,10 +1,5 @@
-﻿import {
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { assertFirebaseReady, db } from "../firebase";
+﻿import { ref, remove, set } from "firebase/database";
+import { assertFirebaseReady, rtdb } from "../firebase";
 import { buildGeminiGenerateUrl, GEMINI_MODEL } from "./geminiConfig";
 
 export type ConnectionCheckResult = {
@@ -62,7 +57,6 @@ export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
         contents: [
           {
             role: "user",
-            // Minimal API test prompt
             parts: [{ text: "Return exactly one token: OK" }],
           },
         ],
@@ -105,6 +99,7 @@ export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> 
     `apiKey=${debugValue(import.meta.env.VITE_FIREBASE_API_KEY as string | undefined)}`,
     `projectId=${debugValue(import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined)}`,
     `authDomain=${debugValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined)}`,
+    `databaseURL=${debugValue(import.meta.env.VITE_FIREBASE_DATABASE_URL as string | undefined)}`,
   ].join(", ");
 
   try {
@@ -117,27 +112,25 @@ export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> 
     };
   }
 
-  const pingRef = doc(
-    db!,
-    "healthchecks",
-    `client-ping-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  );
+  const pingPath = `healthchecks/client-ping-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 
   try {
     await withTimeout(
-      setDoc(pingRef, {
-        createdAt: serverTimestamp(),
+      set(ref(rtdb!, pingPath), {
+        createdAtMs: Date.now(),
         source: "web-client",
       }),
       CHECK_TIMEOUT_MS,
-      "Firebase setDoc"
+      "RealtimeDB set"
     );
-    await withTimeout(deleteDoc(pingRef), CHECK_TIMEOUT_MS, "Firebase deleteDoc");
-    return { ok: true, message: "Firebase write/delete succeeded" };
+    await withTimeout(remove(ref(rtdb!, pingPath)), CHECK_TIMEOUT_MS, "RealtimeDB remove");
+    return { ok: true, message: "Realtime Database write/delete succeeded" };
   } catch (error) {
     return {
       ok: false,
-      message: `Firebase access failed: ${
+      message: `Realtime Database access failed: ${
         error instanceof Error ? error.message : String(error)
       }`,
       debug: firebaseDebug,

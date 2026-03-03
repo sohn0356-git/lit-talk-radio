@@ -1,14 +1,12 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  limit,
+﻿import {
+  get,
+  limitToFirst,
   query,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { assertFirebaseReady, db } from "../firebase";
+  ref,
+  remove,
+  set,
+} from "firebase/database";
+import { assertFirebaseReady, rtdb } from "../firebase";
 import { buildGeminiGenerateUrl, GEMINI_MODEL } from "../services/geminiConfig";
 
 const TIMEOUT_MS = 10000;
@@ -52,6 +50,9 @@ export function renderDiagnostics(root: HTMLElement) {
   const firebaseAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as
     | string
     | undefined;
+  const firebaseDbUrl = import.meta.env.VITE_FIREBASE_DATABASE_URL as
+    | string
+    | undefined;
 
   root.innerHTML = `
     <div class="card">
@@ -66,6 +67,7 @@ export function renderDiagnostics(root: HTMLElement) {
       <div class="muted">VITE_FIREBASE_API_KEY: ${mask(firebaseApiKey)}</div>
       <div class="muted">VITE_FIREBASE_PROJECT_ID: ${mask(firebaseProjectId)}</div>
       <div class="muted">VITE_FIREBASE_AUTH_DOMAIN: ${mask(firebaseAuthDomain)}</div>
+      <div class="muted">VITE_FIREBASE_DATABASE_URL: ${mask(firebaseDbUrl)}</div>
     </div>
 
     <div class="card" style="text-align:left;">
@@ -74,8 +76,8 @@ export function renderDiagnostics(root: HTMLElement) {
           <button class="btn" id="runAllBtn">Run All</button>
           <button class="btn" id="geminiModelsBtn">Gemini: List Models</button>
           <button class="btn" id="geminiGenerateBtn">Gemini: Generate</button>
-          <button class="btn" id="firebaseReadBtn">Firebase: Read</button>
-          <button class="btn" id="firebaseWriteBtn">Firebase: Write/Delete</button>
+          <button class="btn" id="firebaseReadBtn">Realtime DB: Read</button>
+          <button class="btn" id="firebaseWriteBtn">Realtime DB: Write/Delete</button>
         </div>
       </div>
       <pre id="diagLog" style="margin-top:14px; white-space:pre-wrap; word-break:break-word; background:#111; color:#ddd; padding:12px; border-radius:8px; min-height:220px;"></pre>
@@ -188,12 +190,13 @@ export function renderDiagnostics(root: HTMLElement) {
   }
 
   async function testFirebaseRead() {
-    appendLog(`[${nowStamp()}] Firebase read started`);
+    appendLog(`[${nowStamp()}] Realtime DB read started`);
     try {
       assertFirebaseReady();
-      const q = query(collection(db!, "healthchecks"), limit(1));
-      const snap = await withTimeout(getDocs(q), "Firestore read");
-      appendLog(`  OK: read docs=${snap.size}`);
+      const q = query(ref(rtdb!, "healthchecks"), limitToFirst(1));
+      const snap = await withTimeout(get(q), "Realtime DB read");
+      const size = snap.exists() ? Object.keys(snap.val()).length : 0;
+      appendLog(`  OK: read entries=${size}`);
     } catch (error) {
       appendLog(
         `  FAIL: ${error instanceof Error ? error.message : String(error)}`
@@ -202,16 +205,16 @@ export function renderDiagnostics(root: HTMLElement) {
   }
 
   async function testFirebaseWriteDelete() {
-    appendLog(`[${nowStamp()}] Firebase write/delete started`);
+    appendLog(`[${nowStamp()}] Realtime DB write/delete started`);
     try {
       assertFirebaseReady();
       const id = `diag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const ref = doc(db!, "healthchecks", id);
+      const path = `healthchecks/${id}`;
       await withTimeout(
-        setDoc(ref, { createdAt: serverTimestamp(), source: "diagnostics" }),
-        "Firestore setDoc"
+        set(ref(rtdb!, path), { createdAtMs: Date.now(), source: "diagnostics" }),
+        "Realtime DB set"
       );
-      await withTimeout(deleteDoc(ref), "Firestore deleteDoc");
+      await withTimeout(remove(ref(rtdb!, path)), "Realtime DB remove");
       appendLog("  OK: write and delete succeeded");
     } catch (error) {
       appendLog(
