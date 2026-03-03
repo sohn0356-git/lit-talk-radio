@@ -1,14 +1,16 @@
-import {
+﻿import {
   deleteDoc,
   doc,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
 import { assertFirebaseReady, db } from "../firebase";
+import { buildGeminiGenerateUrl, GEMINI_MODEL } from "./geminiConfig";
 
 export type ConnectionCheckResult = {
   ok: boolean;
   message: string;
+  debug?: string;
 };
 
 const CHECK_TIMEOUT_MS = 8000;
@@ -22,7 +24,7 @@ function debugValue(raw: string | undefined): string {
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = window.setTimeout(() => {
-      reject(new Error(`${label} 타임아웃 (${ms}ms)`));
+      reject(new Error(`${label} timeout (${ms}ms)`));
     }, ms);
 
     promise
@@ -38,12 +40,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
   const apiKeyDebug = debugValue(apiKey);
+
   if (!apiKey) {
     return {
       ok: false,
-      message: `VITE_GEMINI_API_KEY 누락 (key: ${apiKeyDebug})`,
+      message: "VITE_GEMINI_API_KEY is missing",
+      debug: `VITE_GEMINI_MODEL=${GEMINI_MODEL}, VITE_GEMINI_API_KEY=${apiKeyDebug}`,
     };
   }
 
@@ -51,52 +55,56 @@ export async function checkGeminiConnection(): Promise<ConnectionCheckResult> {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: "Reply with: ok" }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0,
-            maxOutputTokens: 8,
+    const response = await fetch(buildGeminiGenerateUrl(apiKey), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            // Minimal API test prompt
+            parts: [{ text: "Return exactly one token: OK" }],
           },
-        }),
-        signal: controller.signal,
-      }
-    );
+        ],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 8,
+        },
+      }),
+      signal: controller.signal,
+    });
+
     window.clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errText = await response.text();
       return {
         ok: false,
-        message: `Gemini API 실패 (${response.status}): ${errText} (key: ${apiKeyDebug})`,
+        message: `Gemini API failed (${GEMINI_MODEL}, ${response.status}): ${errText}`,
+        debug: `VITE_GEMINI_MODEL=${GEMINI_MODEL}, VITE_GEMINI_API_KEY=${apiKeyDebug}`,
       };
     }
 
-    return { ok: true, message: "Gemini 연결 정상" };
+    return {
+      ok: true,
+      message: `Gemini connected (${GEMINI_MODEL})`,
+    };
   } catch (error) {
     return {
       ok: false,
-      message: `Gemini 네트워크 오류: ${
+      message: `Gemini network error (${GEMINI_MODEL}): ${
         error instanceof Error ? error.message : String(error)
-      } (key: ${apiKeyDebug})`,
+      }`,
+      debug: `VITE_GEMINI_MODEL=${GEMINI_MODEL}, VITE_GEMINI_API_KEY=${apiKeyDebug}`,
     };
   }
 }
 
 export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> {
   const firebaseDebug = [
-    `apiKey=${debugValue(import.meta.env.VITE_FIREBASE_API_KEY)}`,
-    `projectId=${debugValue(import.meta.env.VITE_FIREBASE_PROJECT_ID)}`,
-    `authDomain=${debugValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN)}`,
+    `apiKey=${debugValue(import.meta.env.VITE_FIREBASE_API_KEY as string | undefined)}`,
+    `projectId=${debugValue(import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined)}`,
+    `authDomain=${debugValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined)}`,
   ].join(", ");
 
   try {
@@ -104,9 +112,8 @@ export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> 
   } catch (error) {
     return {
       ok: false,
-      message: `${
-        error instanceof Error ? error.message : String(error)
-      } (${firebaseDebug})`,
+      message: error instanceof Error ? error.message : String(error),
+      debug: firebaseDebug,
     };
   }
 
@@ -126,13 +133,14 @@ export async function checkFirebaseConnection(): Promise<ConnectionCheckResult> 
       "Firebase setDoc"
     );
     await withTimeout(deleteDoc(pingRef), CHECK_TIMEOUT_MS, "Firebase deleteDoc");
-    return { ok: true, message: "Firebase 쓰기/삭제 정상" };
+    return { ok: true, message: "Firebase write/delete succeeded" };
   } catch (error) {
     return {
       ok: false,
-      message: `Firebase 접근 실패: ${
+      message: `Firebase access failed: ${
         error instanceof Error ? error.message : String(error)
-      } (${firebaseDebug})`,
+      }`,
+      debug: firebaseDebug,
     };
   }
 }

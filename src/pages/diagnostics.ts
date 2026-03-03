@@ -9,6 +9,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { assertFirebaseReady, db } from "../firebase";
+import { buildGeminiGenerateUrl, GEMINI_MODEL } from "../services/geminiConfig";
 
 const TIMEOUT_MS = 10000;
 
@@ -41,6 +42,7 @@ function nowStamp(): string {
 
 export function renderDiagnostics(root: HTMLElement) {
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+  const geminiModel = GEMINI_MODEL;
   const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY as
     | string
     | undefined;
@@ -60,6 +62,7 @@ export function renderDiagnostics(root: HTMLElement) {
     <div class="card" style="text-align:left;">
       <div style="font-weight:700; margin-bottom:8px;">ENV Snapshot (masked)</div>
       <div class="muted">VITE_GEMINI_API_KEY: ${mask(geminiKey)}</div>
+      <div class="muted">VITE_GEMINI_MODEL: ${geminiModel}</div>
       <div class="muted">VITE_FIREBASE_API_KEY: ${mask(firebaseApiKey)}</div>
       <div class="muted">VITE_FIREBASE_PROJECT_ID: ${mask(firebaseProjectId)}</div>
       <div class="muted">VITE_FIREBASE_AUTH_DOMAIN: ${mask(firebaseAuthDomain)}</div>
@@ -155,17 +158,19 @@ export function renderDiagnostics(root: HTMLElement) {
 
     try {
       const response = await withTimeout(
-        fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: "Reply with ok" }] }],
-              generationConfig: { temperature: 0, maxOutputTokens: 8 },
-            }),
-          }
-        ),
+        fetch(buildGeminiGenerateUrl(geminiKey), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: "Return exactly one token: OK" }],
+              },
+            ],
+            generationConfig: { temperature: 0, maxOutputTokens: 8 },
+          }),
+        }),
         "Gemini generate"
       );
       const text = await response.text();
@@ -173,7 +178,7 @@ export function renderDiagnostics(root: HTMLElement) {
         appendLog(`  FAIL: ${response.status} ${text}`);
         return;
       }
-      appendLog("  OK: generateContent succeeded");
+      appendLog(`  OK: generateContent succeeded (${geminiModel})`);
       appendLog(`  body: ${text}`);
     } catch (error) {
       appendLog(

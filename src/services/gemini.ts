@@ -1,4 +1,5 @@
 import type { Expression, SpeakerId, Turn } from "../data";
+import { buildGeminiGenerateUrl, GEMINI_MODEL } from "./geminiConfig";
 
 const ALLOWED_SPEAKER_IDS: SpeakerId[] = ["a", "b", "c", "d"];
 const ALLOWED_EXPRESSIONS: Expression[] = [
@@ -98,7 +99,7 @@ export async function generateDebateTurns(input: {
   ].join("\n");
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    buildGeminiGenerateUrl(apiKey),
     {
       method: "POST",
       headers: {
@@ -121,7 +122,9 @@ export async function generateDebateTurns(input: {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Gemini request failed: ${response.status} ${errText}`);
+    throw new Error(
+      `Gemini request failed (${GEMINI_MODEL}): ${response.status} ${errText}`
+    );
   }
 
   const data = await response.json();
