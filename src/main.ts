@@ -2,12 +2,24 @@ import { renderHome } from "./pages/home";
 import { renderSession } from "./pages/session";
 import { renderTranscript } from "./pages/transcript";
 import { renderArchive } from "./pages/archive";
+import { renderDiagnostics } from "./pages/diagnostics";
 
-export type Route = "/" | "/session" | "/transcript" | "/archive";
+export type Route =
+  | "/"
+  | "/session"
+  | "/transcript"
+  | "/archive"
+  | "/diagnostics";
 
 export function getRoute(): Route {
   const hash = location.hash.replace("#", "") || "/";
-  const allowed: Route[] = ["/", "/session", "/transcript", "/archive"];
+  const allowed: Route[] = [
+    "/",
+    "/session",
+    "/transcript",
+    "/archive",
+    "/diagnostics",
+  ];
   return allowed.includes(hash as Route) ? (hash as Route) : "/";
 }
 
@@ -36,6 +48,7 @@ export function mount() {
     { to: "/session", label: "Session" },
     { to: "/transcript", label: "Transcript" },
     { to: "/archive", label: "Archive" },
+    { to: "/diagnostics", label: "Diagnostics" },
   ];
 
   items.forEach((it) => {
@@ -58,6 +71,7 @@ export function mount() {
   if (route === "/session") renderSession(body);
   if (route === "/transcript") renderTranscript(body);
   if (route === "/archive") renderArchive(body);
+  if (route === "/diagnostics") renderDiagnostics(body);
 
   // 하단 힌트
   const hint = document.createElement("div");
