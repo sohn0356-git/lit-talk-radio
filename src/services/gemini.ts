@@ -63,7 +63,7 @@ function sanitizeTurns(raw: unknown[]): Turn[] {
 export async function generateDebateTurns(input: {
   bookTitle: string;
   chapter: number;
-  personas: Array<{ id: SpeakerId; persona: string }>;
+  personas: Array<{ id: SpeakerId; displayName: string; persona: string }>;
   targetCharCount: number;
 }): Promise<Turn[]> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -74,17 +74,17 @@ export async function generateDebateTurns(input: {
   }
 
   const personaText = input.personas
-    .map((p) => `${p.id.toUpperCase()}: ${p.persona}`)
+    .map((p) => `${p.id}(${p.displayName}): ${p.persona}`)
     .join("\n");
 
   const prompt = [
-    "Generate only a JSON array for a Korean debate script.",
+    "Generate only a JSON array for a Korean discussion script.",
     "",
     `Book: ${input.bookTitle}`,
     `Chapter: ${input.chapter}`,
     `Target total characters: about ${input.targetCharCount}`,
     "",
-    "Character personas:",
+    "Participants and accumulated personas:",
     personaText,
     "",
     "Rules:",
@@ -92,10 +92,14 @@ export async function generateDebateTurns(input: {
     '2) Each item format: {"speakerId":"a|b|c|d","expression":"neutral|smile|serious|angry|surprised","text":"..."}',
     "3) Total turns: 18 to 24.",
     "4) Each text length: 170 to 340 Korean characters.",
-    "5) Keep each speaker personality consistent.",
-    "6) Include key arguments, rebuttals, and counter-rebuttals from the chapter topic.",
-    "7) End with both consensus points and unresolved questions.",
-    "8) The text field must be in Korean.",
+    "5) The text must sound like close friends talking naturally in Korean.",
+    "6) Avoid lecture tone; use casual but clear spoken style.",
+    "7) Keep each speaker personality consistent with accumulated persona.",
+    "8) Stay centered on the selected book chapter, but choose only interesting angles.",
+    "9) Include practical examples, disagreements, and playful reactions.",
+    "10) End with both consensus points and unresolved questions.",
+    "11) The text field must be in Korean.",
+    "12) Do not prefix lines with names or IDs in text field.",
   ].join("\n");
 
   const response = await fetch(

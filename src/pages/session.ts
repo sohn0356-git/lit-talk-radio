@@ -30,6 +30,9 @@ export function renderSession(root: HTMLElement) {
           <div style="font-weight:700; font-size:18px;">Session</div>
           <div class="muted">${sessionData.date} / ${sessionData.bookTitle} / Chapter ${sessionData.chapter}</div>
           <div class="muted">Participants: ${sessionData.participants.length} (max 4) · Turns: ${sessionData.turns.length}</div>
+          <div class="muted">Members: ${sessionData.participants
+            .map((p) => p.displayName || p.id.toUpperCase())
+            .join(", ")}</div>
         </div>
         <div class="muted">Aspect: <span id="aspectLabel">16:9</span></div>
       </div>
@@ -429,7 +432,7 @@ export function renderSession(root: HTMLElement) {
         ctx.font = "800 22px system-ui";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(slot.id.toUpperCase(), slot.x, slot.y);
+        ctx.fillText(p.displayName || p.id.toUpperCase(), slot.x, slot.y);
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
       }

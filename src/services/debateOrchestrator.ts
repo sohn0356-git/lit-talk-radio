@@ -1,7 +1,11 @@
 ﻿import type { Book, DebateSession } from "../data";
 import { PARTICIPANTS } from "../data";
 import { generateDebateTurns } from "./gemini";
-import { saveDebateSession } from "./debateRepository";
+import {
+  getPersonaProfiles,
+  saveDebateSession,
+  updatePersonaProfilesFromSession,
+} from "./debateRepository";
 
 function formatDate(now: Date): string {
   const y = now.getFullYear();
@@ -22,12 +26,22 @@ export async function createDebateSession(
   book: Book,
   chapter: number
 ): Promise<DebateSession> {
+  const personaProfiles = await getPersonaProfiles();
+  const participants = PARTICIPANTS.map((p) => ({
+    ...p,
+    persona: personaProfiles[p.id]?.accumulatedPersona || p.persona,
+  }));
+
   const targetCharCount = 5000;
   const turns = await generateDebateTurns({
     bookTitle: book.title,
     chapter,
     targetCharCount,
-    personas: PARTICIPANTS.map((p) => ({ id: p.id, persona: p.persona })),
+    personas: participants.map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      persona: p.persona,
+    })),
   });
 
   const now = new Date();
@@ -38,12 +52,13 @@ export async function createDebateSession(
     bookId: book.id,
     bookTitle: book.title,
     chapter,
-    participants: PARTICIPANTS,
+    participants,
     turns,
     targetCharCount,
     createdAtMs: now.getTime(),
   };
 
   await saveDebateSession(session);
+  await updatePersonaProfilesFromSession(session);
   return session;
 }

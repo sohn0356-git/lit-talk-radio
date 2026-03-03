@@ -15,7 +15,9 @@ export function renderTranscript(root: HTMLElement) {
 
   const text = session.turns
     .map((t, i) => {
-      const who = t.speakerId.toUpperCase();
+      const who =
+        session.participants.find((p) => p.id === t.speakerId)?.displayName ||
+        t.speakerId.toUpperCase();
       return `${String(i + 1).padStart(2, "0")} ${who}(${t.expression}): ${t.text}`;
     })
     .join("\n\n");
